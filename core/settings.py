@@ -11,6 +11,8 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 from pathlib import Path
+from dotenv import load_dotenv
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -104,6 +106,8 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+OPENSKY_USERNAME = os.getenv('OPENSKY_USERNAME')
+OPENSKY_PASSWORD = os.getenv('OPENSKY_PASSWORD')
 
 # Internationalization
 # https://docs.djangoproject.com/en/6.0/topics/i18n/

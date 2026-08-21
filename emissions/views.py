@@ -1,40 +1,19 @@
-from django.shortcuts import render
-
-# Create your views here.
 import os
 import joblib
 import pandas as pd
+import requests
 from django.conf import settings
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
+from openap import FuelFlow
 from .serializers import FlightInputSerializer
-import requests
-
-MODEL_PATH = os.path.join(settings.BASE_DIR, 'ml_models', 'flight_emissions_model.pkl')
-model = joblib.load(MODEL_PATH)
-
-@api_view(['POST'])
-def predict_emissions(request):
-    serializer = FlightInputSerializer(data=request.data)
-    serializer.is_valid(raise_exception=True)
-
-    aircraft = serializer.validated_data['aircraft']
-    distance_km = serializer.validated_data['distance_km']
-
-    X = pd.DataFrame([{'aircraft': aircraft, 'distance_km': distance_km}])
-    prediction = model.predict(X)[0]
-
-    return Response({
-        'aircraft': aircraft,
-        'distance_km': distance_km,
-        'predicted_co2_kg': round(float(prediction), 2)
-    })
 
 MODEL_PATH = os.path.join(settings.BASE_DIR, 'ml_models', 'flight_emissions_model.pkl')
 model = joblib.load(MODEL_PATH)
 
 ALL_AIRCRAFT = ['A320', 'A321', 'A350', 'B737', 'B738', 'B777', 'B788']
 
+
 @api_view(['POST'])
 def predict_emissions(request):
     serializer = FlightInputSerializer(data=request.data)
@@ -42,8 +21,10 @@ def predict_emissions(request):
 
     aircraft = serializer.validated_data['aircraft']
     distance_km = serializer.validated_data['distance_km']
+
     X_actual = pd.DataFrame([{'aircraft': aircraft, 'distance_km': distance_km}])
     actual_co2 = float(model.predict(X_actual)[0])
+
     X_all = pd.DataFrame([
         {'aircraft': ac, 'distance_km': distance_km} for ac in ALL_AIRCRAFT
     ])
@@ -51,14 +32,15 @@ def predict_emissions(request):
     best_idx = all_preds.argmin()
     optimal_aircraft = ALL_AIRCRAFT[best_idx]
     optimal_co2 = float(all_preds[best_idx])
+
     return Response({
         'aircraft': aircraft,
         'distance_km': distance_km,
         'predicted_co2_kg': round(actual_co2, 2),
         'optimal_aircraft': optimal_aircraft,
         'optimal_co2_kg': round(optimal_co2, 2),
-        'efficiency_gap_pct': round(((actual_co2 - optimal_co2) / actual_co2) * 100, 1)})
-
+        'efficiency_gap_pct': round(((actual_co2 - optimal_co2) / actual_co2) * 100, 1)
+    })
 
 
 @api_view(['GET'])
@@ -72,7 +54,12 @@ def live_flights(request):
     params = {'lamin': lamin, 'lamax': lamax, 'lomin': lomin, 'lomax': lomax}
 
     try:
-        resp = requests.get(url, params=params, timeout=10)
+        resp = requests.get(
+            url,
+            params=params,
+            timeout=15,
+            auth=(settings.OPENSKY_USERNAME, settings.OPENSKY_PASSWORD)
+        )
         resp.raise_for_status()
         data = resp.json()
     except requests.exceptions.RequestException:
@@ -104,7 +91,6 @@ def live_flights(request):
 
     return Response({'count': len(flights), 'flights': flights})
 
-from openap import FuelFlow
 
 @api_view(['POST'])
 def live_flight_rate(request):
@@ -135,6 +121,7 @@ def live_flight_rate(request):
         'co2_kg_per_hour': round(co2_kg_hr, 1),
     })
 
+
 @api_view(['GET'])
 def aircraft_leaderboard(request):
     distance_km = 2000  # fixed reference distance for fair comparison
@@ -146,6 +133,7 @@ def aircraft_leaderboard(request):
         key=lambda r: r['co2_kg']
     )
     return Response({'distance_km': distance_km, 'aircraft': results})
+
 
 @api_view(['GET'])
 def nearby_ngos(request):
@@ -208,6 +196,7 @@ def nearby_ngos(request):
         })
 
     return Response({'ngos': results, 'is_climate_specific': is_climate_specific})
+
 
 @api_view(['GET'])
 def geocode_location(request):
