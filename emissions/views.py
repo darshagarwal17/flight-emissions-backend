@@ -63,20 +63,27 @@ def predict_emissions(request):
 
 @api_view(['GET'])
 def live_flights(request):
-    lamin = request.GET.get('lamin', -10)   # was 45
-    lamax = request.GET.get('lamax', 25)    # was 55
-    lomin = request.GET.get('lomin', 95)    # was -5
-    lomax = request.GET.get('lomax', 145)   # was 15
+    lamin = request.GET.get('lamin', 45)
+    lamax = request.GET.get('lamax', 55)
+    lomin = request.GET.get('lomin', -5)
+    lomax = request.GET.get('lomax', 15)
 
     url = "https://opensky-network.org/api/states/all"
     params = {'lamin': lamin, 'lamax': lamax, 'lomin': lomin, 'lomax': lomax}
 
-    resp = requests.get(url, params=params, timeout=10)
-    resp.raise_for_status()
-    data = resp.json()
+    try:
+        resp = requests.get(url, params=params, timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+    except requests.exceptions.RequestException:
+        return Response({
+            'count': 0,
+            'flights': [],
+            'error': 'Live flight data is temporarily unavailable from this server.'
+        }, status=200)
 
     flights = []
-    for state in (data.get('states') or [])[:100]:  # cap at 100 for performance
+    for state in (data.get('states') or [])[:100]:
         icao24, callsign, origin_country = state[0], state[1], state[2]
         lon, lat, altitude = state[5], state[6], state[7]
         velocity, heading = state[9], state[10]
