@@ -124,4 +124,5 @@ STATIC_URL = 'static/'
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
+    "https://flight-emissions-frontend.vercel.app",
 ]
